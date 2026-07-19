@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal de Documentación</title>
+    <style>
+      :root {
+        --header-bg: #1e293b;
+        --header-text: #f8fafc;
+        --sidebar-bg: #f1f5f9;
+        --sidebar-text: #334155;
+        --accent-color: #2563eb;
+        --accent-hover: #1d4ed8;
+        --border-color: #cbd5e1;
+        --sidebar-width: 300px;
+        --touch-target-height: 44px; /* Estándar óptimo para pantallas táctiles */
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body,
+      html {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      /* Encabezado Fijo */
+      .main-header {
+        height: 60px;
+        background-color: var(--header-bg);
+        color: var(--header-text);
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 20px;
+        padding: 0 20px;
+        z-index: 200;
+        flex-shrink: 0;
+      }
+
+      .logo-area {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0; /* permite que el h1 se recorte en vez de desbordar el header */
+        overflow: hidden;
+      }
+
+      .main-header h1 {
+        font-size: clamp(0.95rem, 3.5vw, 1.4rem);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+
+      .mock-logo {
+        width: 32px;
+        height: 32px;
+        background-color: var(--accent-color);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+      }
+
+      .toggle-btn {
+        background: none;
+        border: none;
+        color: var(--header-text);
+        font-size: 24px;
+        cursor: pointer;
+        padding: 6px 12px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: var(--touch-target-height);
+      }
+
+      .toggle-btn:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+
+      /* Contenedor Principal */
+      .main-container {
+        display: flex;
+        flex: 1;
+        height: calc(100vh - 60px);
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* Barra Lateral con soporte Drawer/Overlay */
+      .sidebar {
+        width: var(--sidebar-width);
+        min-width: var(--sidebar-width);
+        max-width: var(--sidebar-width);
+        background-color: var(--sidebar-bg);
+        border-right: 1px solid var(--border-color);
+        overflow-y: auto;
+        overflow-x: hidden;
+        transition:
+          transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+          width 0.3s ease;
+        z-index: 150;
+        -webkit-overflow-scrolling: touch; /* Aceleración de scroll inercial en iOS */
+      }
+
+      /* Capa de sombreado de fondo para móviles/tablets */
+      .sidebar-overlay {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.4);
+        z-index: 140;
+        transition: opacity 0.3s ease;
+      }
+
+      .sidebar-overlay.active {
+        display: block;
+      }
+
+      /* Árbol de Navegación */
+      .tree-nav {
+        padding: 15px 10px;
+        width: 100%;
+      }
+
+      .tree-root {
+        list-style: none;
+        padding-left: 0;
+      }
+
+      .tree-node {
+        list-style: none;
+        width: 100%;
+      }
+
+      .node-children {
+        display: none;
+        list-style: none;
+        padding-left: 12px;
+        border-left: 1px dashed var(--border-color);
+        margin-left: 10px;
+      }
+
+      .node-children.open {
+        display: block;
+      }
+
+      .node-row {
+        display: flex;
+        align-items: center;
+        padding: 10px 8px;
+        cursor: pointer;
+        border-radius: 6px;
+        color: var(--sidebar-text);
+        text-decoration: none;
+        user-select: none;
+        margin: 4px 0;
+        width: 100%;
+        overflow: hidden;
+        min-height: var(--touch-target-height); /* Garantía de área táctil */
+      }
+
+      .node-row:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+      }
+
+      .node-row.active {
+        background-color: rgba(37, 99, 235, 0.1);
+        color: var(--accent-color);
+        font-weight: 500;
+      }
+
+      .node-icon {
+        flex-shrink: 0;
+        margin-right: 10px;
+        width: 20px;
+        text-align: center;
+        font-size: 1.1rem;
+      }
+
+      /* Chevron elegante: indica que una carpeta tiene contenido expandible */
+      .node-arrow {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        margin-right: 4px;
+        color: var(--sidebar-text);
+        opacity: 0.55;
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .node-arrow svg {
+        width: 10px;
+        height: 10px;
+        display: block;
+      }
+
+      .node-arrow.open {
+        transform: rotate(90deg);
+      }
+
+      /* Espaciador para alinear ítems sin hijos con los que sí tienen chevron */
+      .node-arrow-spacer {
+        flex-shrink: 0;
+        display: inline-block;
+        width: 16px;
+        margin-right: 4px;
+      }
+
+      .node-text {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* Viewport Central */
+      .content-viewport {
+        flex: 1;
+        position: relative;
+        background-color: #ffffff;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        display: block;
+      }
+
+      .direct-content {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        padding: 20px;
+        overflow-y: auto;
+        background: white;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      /* Tarjeta de apertura de PDF: en vez de intentar incrustar el PDF
+         (Safari iOS no lo renderiza embebido de forma confiable), se muestra
+         un botón real <a> que deja que cada sistema operativo maneje el PDF
+         con su propio visor nativo (paginación y zoom perfectos). */
+      .pdf-open-card {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        gap: 16px;
+        padding: 20px;
+      }
+
+      .pdf-open-icon {
+        font-size: 56px;
+        line-height: 1;
+      }
+
+      .pdf-open-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--sidebar-text);
+        max-width: 90%;
+        word-break: break-word;
+      }
+
+      .pdf-open-hint {
+        color: #64748b;
+        max-width: 380px;
+        font-size: 0.9rem;
+      }
+
+      .pdf-open-btn {
+        background-color: var(--accent-color);
+        color: #ffffff;
+        text-decoration: none;
+        font-weight: 600;
+        padding: 14px 28px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: var(--touch-target-height);
+        transition: background-color 0.2s ease;
+      }
+
+      .pdf-open-btn:hover {
+        background-color: var(--accent-hover);
+      }
+
+      /* Clases de utilidad para contenidos directos/LinkedIn */
+      .max-w-4xl {
+        max-w: 56rem;
+      }
+      .mx-auto {
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .px-4 {
+        padding-left: 1rem;
+        padding-right: 1rem;
+      }
+      .py-10 {
+        padding-top: 2.5rem;
+        padding-bottom: 2.5rem;
+      }
+      .text-3xl {
+        font-size: 1.75rem;
+        line-height: 2.25rem;
+      }
+      .font-bold {
+        font-weight: 700;
+      }
+      .mb-10 {
+        margin-bottom: 2rem;
+      }
+      .mt-8 {
+        margin-top: 2rem;
+      }
+      .text-center {
+        text-align: center;
+      }
+      .text-gray-800 {
+        color: #1f2937;
+      }
+      .inline-flex {
+        display: inline-flex;
+      }
+      .items-center {
+        align-items: center;
+      }
+      .gap-3 {
+        gap: 0.75rem;
+      }
+      .rounded-full {
+        border-radius: 9999px;
+      }
+      .shadow-xl {
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+      }
+      .transition-all {
+        transition: all 0.3s ease;
+      }
+      .w-6 {
+        width: 1.5rem;
+      }
+      .h-6 {
+        height: 1.5rem;
+      }
+
+      .linkedin-btn {
+        background-color: #0077b5;
+        color: white;
+        text-decoration: none;
+        padding: 0.75rem 2rem;
+      }
+      .linkedin-btn:hover {
+        background-color: #005a87;
+      }
+
+      /* ==========================================================================
+         DISEÑO RESPONSIVO: Adaptación para Tablets, iPads y Smartphones
+         ========================================================================== */
+      @media (max-width: 1024px) {
+        .sidebar {
+          position: absolute;
+          top: 0;
+          left: 0;
+          bottom: 0;
+          height: 100%;
+          transform: translateX(
+            -100%
+          ); /* Escondido por defecto en modo Drawer */
+          box-shadow: 5px 0 15px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Cuando no está colapsado, se muestra deslizándose por encima */
+        .sidebar.open {
+          transform: translateX(0);
+        }
+
+        /* En móviles/tablets la clase collapsed significa ocultarse del todo */
+        .sidebar.collapsed {
+          transform: translateX(-100%);
+        }
+      }
+
+      /* Ajuste fino para teléfonos muy angostos (ej. 320-400px) */
+      @media (max-width: 400px) {
+        .main-header {
+          gap: 10px;
+          padding: 0 12px;
+        }
+
+        .sidebar {
+          width: 85vw;
+          min-width: 0;
+          max-width: 85vw;
+        }
+      }
+    </style>
+
+    <!-- DATA_START -->
+    <script>
+window.projectData = [
+  {
+    "id": "node-I001-0",
+    "title": "Bienvenido",
+    "type": "folder",
+    "children": []
+  },
+  {
+    "id": "node-I002-1",
+    "title": "Encuesta",
+    "type": "folder",
+    "children": []
+  },
+  {
+    "id": "node-I003-2",
+    "title": "Material",
+    "type": "folder",
+    "children": [
+      {
+        "id": "node-I004-0",
+        "title": "Revista Semana",
+        "type": "external",
+        "url": "www.semana.com"
+      },
+      {
+        "id": "node-I005-1",
+        "title": "Bonus",
+        "type": "external",
+        "url": "Bonus-personalisierter_Agent.pdf"
+      },
+      {
+        "id": "node-I006-2",
+        "title": "Nuevo Documento",
+        "type": "direct",
+        "content": "<h1>Nuevo Contenido</h1>"
+      },
+      {
+        "id": "node-I007-3",
+        "title": "Ensayo pdf",
+        "type": "external",
+        "url": "Bonus-personalisierter_Agent.pdf"
+      }
+    ]
+  },
+  {
+    "id": "node-I008-3",
+    "title": "Acerca de Nosotros",
+    "type": "folder",
+    "children": [
+      {
+        "id": "node-I009-0",
+        "title": "Dr. Hector Upegui",
+        "type": "direct",
+        "content": "<div class=\"max-w-4xl mx-auto px-4 py-10\">\n    <h2 class=\"text-3xl font-bold mb-10 text-center text-gray-800\">Über mich</h2>\n    <div style=\"display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;\">\n        <div style=\"margin: 0 auto; display: inline-block; min-width: 250px;\">\n            <div class=\"badge-base LI-profile-badge\" data-locale=\"de_DE\" data-size=\"large\" data-theme=\"light\" data-type=\"VERTICAL\" data-vanity=\"hectorupegui\" data-version=\"v1\">\n                <a class=\"badge-base__link LI-simple-link\" href=\"https://de.linkedin.com/in/hectorupegui?trk=profile-badge\"></a>\n            </div>\n        </div>\n        <div class=\"mt-8\">\n            <a href=\"https://www.linkedin.com/in/hectorupegui\" target=\"_blank\" class=\"inline-flex items-center gap-3 linkedin-btn rounded-full font-bold transition-all shadow-xl\">\n                <svg class=\"w-6 h-6\" fill=\"currentColor\" viewBox=\"0 0 24 24\">\n                    <path d=\"M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z\" />\n                </svg>\n                Mein LinkedIn Profil besuchen\n            </a>\n        </div> \n    </div>\n</div>"
+      },
+      {
+        "id": "node-I00A-1",
+        "title": "biatris",
+        "type": "folder",
+        "children": []
+      }
+    ]
+  }
+];
+    </script>
+    <!-- DATA_END -->
+    <script
+      src="https://platform.linkedin.com/badges/js/profile.js"
+      async
+      defer
+    ></script>
+  </head>
+  <body>
+    <header class="main-header">
+      <button
+        id="toggle-sidebar-btn"
+        class="toggle-btn"
+        aria-label="Menú de navegación"
+      >
+        ☰
+      </button>
+      <div class="logo-area">
+        <div class="mock-logo">M</div>
+        <h1>Portal de Documentación</h1>
+      </div>
+    </header>
+
+    <div class="main-container">
+      <!-- Capa traslúcida para cerrar el menú en tablets al tocar fuera -->
+      <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+      <aside id="sidebar" class="sidebar">
+        <nav id="tree-navigation" class="tree-nav"></nav>
+      </aside>
+
+      <main class="content-viewport">
+        <iframe
+          id="content-frame"
+          name="content-frame"
+          src="about:blank"
+          title="Contenido"
+        ></iframe>
+        <div id="direct-content-layer" class="direct-content hidden"></div>
+      </main>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const sidebar = document.getElementById("sidebar");
+        const toggleBtn = document.getElementById("toggle-sidebar-btn");
+        const overlay = document.getElementById("sidebar-overlay");
+        const treeNav = document.getElementById("tree-navigation");
+        const iframe = document.getElementById("content-frame");
+        const directContentLayer = document.getElementById(
+          "direct-content-layer",
+        );
+
+        // Determinar si la pantalla actual es Tablet o Móvil
+        function isMobileOrTablet() {
+          return window.innerWidth <= 1024;
+        }
+
+        // Inicializar estado del menú según el dispositivo
+        if (isMobileOrTablet()) {
+          sidebar.classList.remove("open");
+        } else {
+          sidebar.classList.remove("collapsed");
+        }
+
+        // Acción del botón Hamburguesa ☰
+        toggleBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (isMobileOrTablet()) {
+            const isOpen = sidebar.classList.toggle("open");
+            overlay.classList.toggle("active", isOpen);
+          } else {
+            sidebar.classList.toggle("collapsed");
+          }
+        });
+
+        // Cerrar menú al hacer click en la capa oscura de fondo
+        overlay.addEventListener("click", () => {
+          sidebar.classList.remove("open");
+          overlay.classList.remove("active");
+        });
+
+        function clearActiveStates() {
+          document.querySelectorAll(".node-row").forEach((row) => {
+            row.classList.remove("active");
+          });
+        }
+
+        function buildTreeDOM(nodesArray, isRoot = false) {
+          const ul = document.createElement("ul");
+          ul.classList.add(isRoot ? "tree-root" : "node-children");
+
+          nodesArray.forEach((node) => {
+            const li = document.createElement("li");
+            li.classList.add("tree-node");
+
+            const row = document.createElement("div");
+            row.classList.add("node-row");
+
+            const iconSpan = document.createElement("span");
+            iconSpan.classList.add("node-icon");
+
+            const textSpan = document.createElement("span");
+            textSpan.classList.add("node-text");
+            textSpan.textContent = node.title;
+            textSpan.title = node.title;
+
+            const hasChildren =
+              node.type === "folder" && node.children && node.children.length > 0;
+
+            // Chevron elegante: solo se muestra en carpetas con contenido.
+            // En el resto se agrega un espaciador para mantener la alineación.
+            let arrowSpan = null;
+            if (hasChildren) {
+              arrowSpan = document.createElement("span");
+              arrowSpan.classList.add("node-arrow");
+              arrowSpan.innerHTML =
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>';
+              row.appendChild(arrowSpan);
+            } else {
+              const spacer = document.createElement("span");
+              spacer.classList.add("node-arrow-spacer");
+              row.appendChild(spacer);
+            }
+
+            row.appendChild(iconSpan);
+            row.appendChild(textSpan);
+
+            if (node.type === "folder") {
+              iconSpan.textContent = "📁";
+
+              if (hasChildren) {
+                const childUl = buildTreeDOM(node.children, false);
+                row.addEventListener("click", (e) => {
+                  e.stopPropagation();
+                  const isOpen = childUl.classList.toggle("open");
+                  iconSpan.textContent = isOpen ? "📂" : "📁";
+                  arrowSpan.classList.toggle("open", isOpen);
+                });
+                li.appendChild(row);
+                li.appendChild(childUl);
+              } else {
+                row.addEventListener("click", (e) => {
+                  e.stopPropagation();
+                });
+                li.appendChild(row);
+              }
+            } else if (node.type === "external" || node.type === "direct") {
+              let nodeIcon = node.type === "external" ? "🌐" : "📄";
+              const lowerTitle = node.title.toLowerCase();
+
+              if (
+                lowerTitle.includes("linkedin") ||
+                lowerTitle.includes("sobre mí") ||
+                lowerTitle.includes("perfil")
+              ) {
+                nodeIcon = "👤";
+              } else if (
+                lowerTitle.includes("configuracion") ||
+                lowerTitle.includes("ajustes")
+              ) {
+                nodeIcon = "⚙️";
+              }
+
+              if (node.icon) {
+                nodeIcon = node.icon;
+              }
+
+              iconSpan.textContent = nodeIcon;
+
+              row.addEventListener("click", (e) => {
+                e.stopPropagation();
+                clearActiveStates();
+                row.classList.add("active");
+                handleItemClick(node);
+
+                // UX TÁCTIL: Auto-colapsar barra lateral tras presionar en tablet/smartphone
+                if (isMobileOrTablet()) {
+                  sidebar.classList.remove("open");
+                  overlay.classList.remove("active");
+                }
+              });
+
+              li.appendChild(row);
+            }
+
+            ul.appendChild(li);
+          });
+
+          return ul;
+        }
+
+        function escapeHtml(str) {
+          const div = document.createElement("div");
+          div.textContent = str || "";
+          return div.innerHTML;
+        }
+
+        function handleItemClick(item) {
+          if (item.type === "external") {
+            const url = item.url || "about:blank";
+            const isPdf = /\.pdf(\?.*)?$/i.test(url);
+
+            // En móvil/tablet, los navegadores no manejan de forma confiable
+            // un PDF incrustado en iframe (Safari iOS lo muestra en blanco,
+            // Android a veces requiere un toque extra). En vez de pelear
+            // contra eso, se muestra una tarjeta con un botón <a> real que
+            // deja que el sistema operativo abra el PDF con su propio visor
+            // nativo (paginación y zoom funcionan perfecto de esa forma).
+            if (isPdf && isMobileOrTablet()) {
+              iframe.classList.add("hidden");
+              iframe.src = "about:blank";
+              directContentLayer.classList.remove("hidden");
+              directContentLayer.innerHTML = `
+                <div class="pdf-open-card">
+                  <div class="pdf-open-icon">📄</div>
+                  <div class="pdf-open-title">${escapeHtml(item.title)}</div>
+                  <div class="pdf-open-hint">
+                    Este documento se abrirá con el visor de PDF de tu dispositivo.
+                  </div>
+                  <a class="pdf-open-btn" href="${url}" target="_blank" rel="noopener">
+                    📥 Abrir PDF
+                  </a>
+                </div>
+              `;
+              return;
+            }
+
+            directContentLayer.classList.add("hidden");
+            iframe.classList.remove("hidden");
+            iframe.src = url;
+          } else if (item.type === "direct") {
+            iframe.classList.add("hidden");
+            iframe.src = "about:blank";
+            directContentLayer.classList.remove("hidden");
+            directContentLayer.innerHTML =
+              item.content || "<i>Sin contenido registrado</i>";
+
+            if (typeof IN !== "undefined" && IN.parse) {
+              IN.parse();
+            }
+          }
+        }
+
+        // Inicialización del Árbol
+        if (
+          typeof window.projectData !== "undefined" &&
+          Array.isArray(window.projectData)
+        ) {
+          const treeDOM = buildTreeDOM(window.projectData, true);
+          treeNav.appendChild(treeDOM);
+        } else {
+          treeNav.innerHTML =
+            "<p style='color:red; padding:10px;'>Error: No se detectó 'window.projectData'.</p>";
+        }
+
+        // Recalcular estados visuales si se cambia la orientación del dispositivo
+        window.addEventListener("resize", () => {
+          if (!isMobileOrTablet()) {
+            sidebar.classList.remove("open");
+            overlay.classList.remove("active");
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
