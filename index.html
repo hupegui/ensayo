@@ -1,0 +1,1480 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IA en salud</title>
+    <script>
+      // Aplica el tema guardado (o la preferencia del sistema) antes de
+      // pintar la página, para evitar un parpadeo del tema incorrecto.
+      (function () {
+        try {
+          const saved = localStorage.getItem("spa-theme");
+          const prefersDark =
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches;
+          const theme = saved || (prefersDark ? "dark" : "light");
+          document.documentElement.setAttribute("data-theme", theme);
+        } catch (e) {
+          // localStorage puede fallar en algunos contextos (file://, iframes
+          // restringidos); si eso pasa, simplemente se queda en modo claro.
+        }
+      })();
+    </script>
+    <style>
+      :root {
+        --header-bg: #1e293b;
+        --header-text: #f8fafc;
+        --sidebar-bg: #ffffff;
+        --sidebar-text: #334155;
+        --accent-color: #2563eb;
+        --accent-hover: #1d4ed8;
+        --accent-tint: rgba(37, 99, 235, 0.1);
+        --border-color: #e2e8f0;
+        --sidebar-width: 300px;
+        --touch-target-height: 44px; /* Estándar óptimo para pantallas táctiles */
+        --radius: 10px;
+        --radius-lg: 14px;
+        --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+        --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
+        --surface-bg: #ffffff;
+        --text-heading: #0f172a;
+        --text-body: #334155;
+        --text-muted: #94a3b8;
+        --muted-tint: rgba(148, 163, 184, 0.15);
+        --text-color: var(
+          --text-heading
+        ); /* alias: compatibilidad con contenido existente */
+      }
+
+      /* Modo oscuro: se activa agregando data-theme="dark" al <html> */
+      :root[data-theme="dark"] {
+        --header-bg: #0b1220;
+        --sidebar-bg: #111827;
+        --sidebar-text: #cbd5e1;
+        --accent-color: #3b82f6;
+        --accent-hover: #60a5fa;
+        --accent-tint: rgba(59, 130, 246, 0.18);
+        --border-color: #1f2937;
+        --surface-bg: #0b1220;
+        --text-heading: #f1f5f9;
+        --text-body: #cbd5e1;
+        --text-muted: #64748b;
+        --muted-tint: rgba(100, 116, 139, 0.2);
+        --text-color: var(
+          --text-heading
+        ); /* alias: compatibilidad con contenido existente */
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body,
+      html {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      /* Encabezado Fijo */
+      .main-header {
+        height: 60px;
+        background-color: var(--header-bg);
+        color: var(--header-text);
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 20px;
+        padding: 0 22px;
+        z-index: 200;
+        flex-shrink: 0;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .logo-area {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0; /* permite que el h1 se recorte en vez de desbordar el header */
+        overflow: hidden;
+      }
+
+      .main-header h1 {
+        font-size: clamp(0.95rem, 3.5vw, 1.4rem);
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+
+      .logo-img {
+        height: 36px;
+        width: auto;
+        display: block;
+        flex-shrink: 0;
+      }
+
+      .toggle-btn {
+        background: none;
+        border: none;
+        color: var(--header-text);
+        font-size: 24px;
+        cursor: pointer;
+        padding: 6px 12px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: var(--touch-target-height);
+      }
+
+      .toggle-btn:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .header-spacer {
+        flex: 1;
+      }
+
+      .theme-toggle-btn svg {
+        width: 19px;
+        height: 19px;
+      }
+
+      /* Contenedor Principal */
+      .main-container {
+        display: flex;
+        flex: 1;
+        height: calc(100vh - 60px);
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* Barra Lateral con soporte Drawer/Overlay */
+      .sidebar {
+        width: var(--sidebar-width);
+        min-width: var(--sidebar-width);
+        max-width: var(--sidebar-width);
+        background-color: var(--sidebar-bg);
+        box-shadow: 1px 0 0 var(--border-color);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        transition:
+          transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+          width 0.3s ease;
+        z-index: 150;
+      }
+
+      /* Capa de sombreado de fondo para móviles/tablets */
+      .sidebar-overlay {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.4);
+        z-index: 140;
+        transition: opacity 0.3s ease;
+      }
+
+      .sidebar-overlay.active {
+        display: block;
+      }
+
+      /* Árbol de Navegación */
+      /* Buscador del sidebar */
+      .sidebar-search-wrap {
+        position: relative;
+        padding: 14px 14px 4px;
+        flex-shrink: 0;
+      }
+
+      .sidebar-search-icon {
+        position: absolute;
+        left: 26px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 15px;
+        height: 15px;
+        color: var(--text-muted);
+        pointer-events: none;
+      }
+
+      .sidebar-search-input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 8px 10px 8px 32px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        font-size: 0.85rem;
+        font-family: inherit;
+        color: var(--sidebar-text);
+        outline: none;
+        transition:
+          border-color 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+
+      .sidebar-search-input:focus {
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 3px var(--accent-tint);
+      }
+
+      /* Contador de ítems dentro de una carpeta */
+      .node-count {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        background: var(--muted-tint);
+        border-radius: 999px;
+        padding: 1px 7px;
+        margin-left: 6px;
+        flex-shrink: 0;
+      }
+
+      .node-row.active .node-count {
+        color: var(--accent-color);
+        background: #ffffff;
+      }
+
+      .tree-nav {
+        padding: 10px 10px 15px;
+        width: 100%;
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .tree-root {
+        list-style: none;
+        padding-left: 0;
+      }
+
+      .tree-node {
+        list-style: none;
+        width: 100%;
+      }
+
+      /* Oculto por el buscador cuando no coincide */
+      .tree-node.search-hidden {
+        display: none;
+      }
+
+      .node-children {
+        display: none;
+        list-style: none;
+        padding-left: 14px;
+        border-left: 1px solid var(--border-color);
+        margin-left: 14px;
+      }
+
+      .node-children.open {
+        display: block;
+      }
+
+      .node-row {
+        display: flex;
+        align-items: center;
+        padding: 10px 10px;
+        cursor: pointer;
+        border-radius: var(--radius);
+        color: var(--sidebar-text);
+        text-decoration: none;
+        user-select: none;
+        margin: 2px 0;
+        width: 100%;
+        overflow: hidden;
+        min-height: var(--touch-target-height); /* Garantía de área táctil */
+        transition:
+          background-color 0.15s ease,
+          color 0.15s ease;
+      }
+
+      .node-row:hover {
+        background-color: var(--accent-tint);
+      }
+
+      .node-row.active {
+        background-color: var(--accent-tint);
+        color: var(--accent-color);
+        font-weight: 500;
+      }
+
+      .node-row.active .node-arrow,
+      .node-row.active .node-icon,
+      .node-row.active .node-icon svg {
+        color: var(--accent-color);
+        opacity: 0.95;
+      }
+
+      .node-icon {
+        flex-shrink: 0;
+        margin-right: 10px;
+        width: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+      }
+
+      .node-icon svg {
+        width: 17px;
+        height: 17px;
+        display: block;
+        color: var(
+          --text-muted
+        ); /* tono neutro para carpetas, se tiñe en hover/activo */
+      }
+
+      /* Chevron elegante: indica que una carpeta tiene contenido expandible */
+      .node-arrow {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        margin-right: 4px;
+        color: var(--sidebar-text);
+        opacity: 0.55;
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .node-arrow svg {
+        width: 10px;
+        height: 10px;
+        display: block;
+      }
+
+      .node-arrow.open {
+        transform: rotate(90deg);
+      }
+
+      /* Espaciador para alinear ítems sin hijos con los que sí tienen chevron */
+      .node-arrow-spacer {
+        flex-shrink: 0;
+        display: inline-block;
+        width: 16px;
+        margin-right: 4px;
+      }
+
+      /* Separador de sección: etiqueta visual, no clickeable */
+      .tree-divider {
+        padding: 16px 10px 6px;
+      }
+
+      .tree-divider:first-child {
+        padding-top: 4px;
+      }
+
+      .tree-divider-label {
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+
+      .node-text {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* Viewport Central */
+      .content-viewport {
+        flex: 1;
+        position: relative;
+        background-color: var(--surface-bg);
+        height: 100%;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Barra de progreso de lectura: solo tiene sentido en contenido de
+         texto (nodos "direct"), se oculta en iframes/PDF/estado vacío. */
+      .reading-progress-track {
+        flex-shrink: 0;
+        height: 3px;
+        background: var(--border-color);
+      }
+
+      .reading-progress-fill {
+        height: 100%;
+        width: 0%;
+        background: var(--accent-color);
+        transition: width 0.1s ease-out;
+      }
+
+      /* Skeleton loader: se muestra mientras carga un iframe externo, en
+         vez de dejar un espacio en blanco. Ocupa el mismo espacio flexible
+         que el iframe/direct-content (se turnan mostrándose/ocultándose). */
+      .skeleton-loader {
+        flex: 1;
+        min-height: 0;
+        padding: 40px 24px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .skel-block {
+        border-radius: 6px;
+        background: var(--muted-tint);
+        animation: skeleton-pulse 1.4s ease-in-out infinite;
+      }
+
+      .skel-header {
+        height: 28px;
+        width: 40%;
+      }
+
+      .skel-line {
+        height: 14px;
+        width: 100%;
+      }
+
+      .skel-line.short {
+        width: 55%;
+      }
+
+      @keyframes skeleton-pulse {
+        0%,
+        100% {
+          opacity: 0.6;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+
+      /* Breadcrumb: ubicación dentro del árbol */
+      .content-breadcrumb {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 20px;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        border-bottom: 1px solid var(--border-color);
+        background: var(--surface-bg);
+      }
+
+      .content-breadcrumb .crumb-current {
+        color: var(--text-body);
+        font-weight: 500;
+      }
+
+      .content-breadcrumb .crumb-link {
+        cursor: pointer;
+        transition: color 0.15s ease;
+      }
+
+      .content-breadcrumb .crumb-link:hover {
+        color: var(--accent-color);
+        text-decoration: underline;
+      }
+
+      /* Estado vacío antes de seleccionar cualquier elemento */
+      .empty-state {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      .empty-state svg {
+        width: 46px;
+        height: 46px;
+        opacity: 0.6;
+      }
+
+      .empty-state p {
+        font-size: 0.95rem;
+        margin: 0;
+      }
+
+      /* Transición suave al cambiar de contenido */
+      @keyframes contentFadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .content-fade-in {
+        animation: contentFadeIn 0.25s ease;
+      }
+
+      iframe {
+        width: 100%;
+        flex: 1;
+        min-height: 0;
+        border: none;
+        display: block;
+      }
+
+      .direct-content {
+        flex: 1;
+        min-height: 0;
+        width: 100%;
+        padding: 32px 20px;
+        overflow-y: auto;
+        background: var(--surface-bg);
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* Tipografía moderna para el contenido embebido: ancho de lectura
+         cómodo, interlineado generoso y jerarquía visual clara, sin que
+         cada nodo tenga que definir sus propios estilos. */
+      .direct-content > * {
+        max-width: 720px;
+        margin-left: 0;
+        margin-right: auto;
+        width: 100%; /* Asegura que ocupe todo el ancho disponible si la pantalla es menor a 720px */
+      }
+
+      .direct-content h1,
+      .direct-content h2 {
+        font-size: clamp(
+          1.3rem,
+          4vw,
+          1.6rem
+        ); /* Se adapta dinámicamente al ancho de la pantalla */
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        color: var(--text-heading);
+        margin-bottom: 16px;
+        line-height: 1.3;
+      }
+
+      .direct-content h3 {
+        font-size: clamp(1.1rem, 3vw, 1.15rem);
+        font-weight: 600;
+        color: var(--text-heading);
+        margin: 26px 0 10px;
+        line-height: 1.3;
+      }
+
+      .direct-content p {
+        font-size: 1rem;
+        line-height: 1.75;
+        color: var(--text-body);
+        margin-bottom: 14px;
+        word-wrap: break-word; /* Evita que palabras muy largas rompan el diseño */
+      }
+
+      .direct-content ul,
+      .direct-content ol {
+        padding-left: 1.4rem;
+        margin-bottom: 14px;
+        line-height: 1.75;
+        color: var(--text-body);
+      }
+
+      /* Imágenes y bordes */
+      .direct-content img {
+        max-width: 100%;
+        height: auto;
+        border-radius: var(--radius);
+        box-sizing: border-box;
+      }
+
+      /* Asegurar que cajas con fondo no desborden en móviles */
+      .direct-content div[style*="background-color"] {
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+
+      /* Control específico para tablas responsivas con scroll horizontal seguro */
+      .direct-content table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+      }
+
+      /* Contenedor o regla para que las tablas tengan scroll horizontal en móvil */
+      .direct-content div.table-responsive,
+      .direct-content table {
+        box-sizing: border-box;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      /* Tarjeta de apertura de PDF: en vez de intentar incrustar el PDF
+         (Safari iOS no lo renderiza embebido de forma confiable), se muestra
+         un botón real <a> que deja que cada sistema operativo maneje el PDF
+         con su propio visor nativo (paginación y zoom perfectos). */
+      .pdf-open-card {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        gap: 16px;
+        padding: 20px;
+      }
+
+      .pdf-open-icon {
+        font-size: 56px;
+        line-height: 1;
+      }
+
+      .pdf-open-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--sidebar-text);
+        max-width: 90%;
+        word-break: break-word;
+      }
+
+      .pdf-open-hint {
+        color: var(--text-muted);
+        max-width: 380px;
+        font-size: 0.9rem;
+      }
+
+      .pdf-open-btn {
+        background-color: var(--accent-color);
+        color: #ffffff;
+        text-decoration: none;
+        font-weight: 600;
+        padding: 14px 28px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: var(--touch-target-height);
+        transition: background-color 0.2s ease;
+      }
+
+      .pdf-open-btn:hover {
+        background-color: var(--accent-hover);
+      }
+
+      /* Clases de utilidad para contenidos directos/LinkedIn */
+      .max-w-4xl {
+        max-width: 56rem;
+      }
+      .mx-auto {
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .px-4 {
+        padding-left: 1rem;
+        padding-right: 1rem;
+      }
+      .py-10 {
+        padding-top: 2.5rem;
+        padding-bottom: 2.5rem;
+      }
+      .text-3xl {
+        font-size: 1.75rem;
+        line-height: 2.25rem;
+      }
+      .font-bold {
+        font-weight: 700;
+      }
+      .mb-10 {
+        margin-bottom: 2rem;
+      }
+      .mt-8 {
+        margin-top: 2rem;
+      }
+      .text-center {
+        text-align: center;
+      }
+      .text-gray-800 {
+        color: #1f2937;
+      }
+      .inline-flex {
+        display: inline-flex;
+      }
+      .items-center {
+        align-items: center;
+      }
+      .gap-3 {
+        gap: 0.75rem;
+      }
+      .rounded-full {
+        border-radius: 9999px;
+      }
+      .shadow-xl {
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+      }
+      .transition-all {
+        transition: all 0.3s ease;
+      }
+      .w-6 {
+        width: 1.5rem;
+      }
+      .h-6 {
+        height: 1.5rem;
+      }
+
+      .linkedin-btn {
+        background-color: #0077b5;
+        color: white;
+        text-decoration: none;
+        padding: 0.75rem 2rem;
+      }
+      .linkedin-btn:hover {
+        background-color: #005a87;
+      }
+
+      /* ==========================================================================
+         DISEÑO RESPONSIVO: Adaptación para Tablets, iPads y Smartphones
+         ========================================================================== */
+      @media (max-width: 1024px) {
+        .sidebar {
+          position: absolute;
+          top: 0;
+          left: 0;
+          bottom: 0;
+          height: 100%;
+          transform: translateX(
+            -100%
+          ); /* Escondido por defecto en modo Drawer */
+          box-shadow: 5px 0 15px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Cuando no está colapsado, se muestra deslizándose por encima */
+        .sidebar.open {
+          transform: translateX(0);
+        }
+
+        /* En móviles/tablets la clase collapsed significa ocultarse del todo */
+        .sidebar.collapsed {
+          transform: translateX(-100%);
+        }
+      }
+
+      /* Ajuste fino para teléfonos muy angostos (ej. 320-400px) */
+      @media (max-width: 400px) {
+        .main-header {
+          gap: 10px;
+          padding: 0 12px;
+        }
+
+        .sidebar {
+          width: 85vw;
+          min-width: 0;
+          max-width: 85vw;
+        }
+      }
+    </style>
+
+    <!-- DATA_START -->
+    <script>
+      window.projectData = [
+  {
+    "id": "node-I001-0",
+    "title": "Encuesta",
+    "type": "folder",
+    "children": []
+  },
+  {
+    "id": "node-I002-1",
+    "title": "Agenda",
+    "type": "folder",
+    "children": [
+      {
+        "id": "node-I003-0",
+        "title": "Revista Semana",
+        "type": "external",
+        "url": "https://www.semana.com"
+      },
+      {
+        "id": "node-I004-1",
+        "title": "Bonus",
+        "type": "external",
+        "url": "Bonus-personalisierter_Agent.pdf"
+      },
+      {
+        "id": "node-I005-2",
+        "title": "Nuevo Documento",
+        "type": "direct",
+        "content": "<h1>Nuevo Contenido</h1>"
+      },
+      {
+        "id": "node-I006-3",
+        "title": "Ensayo pdf",
+        "type": "external",
+        "url": "Bonus-personalisierter_Agent.pdf"
+      }
+    ]
+  },
+  {
+    "id": "node-I007-2",
+    "title": "Contenidos Finales",
+    "type": "folder",
+    "children": [
+      {
+        "id": "node-I008-0",
+        "title": "¡Bienvenido/a al Curso de Inteligencia Artificial en Salud!",
+        "type": "direct",
+        "content": "<h2>¡Bienvenido/a al Curso!</h2>\n\n<p>\n  Le damos la más cordial bienvenida a esta experiencia de aprendizaje...\n</p>"
+      }
+    ]
+  },
+  {
+    "id": "node-I009-3",
+    "title": "Acerca de Nosotros",
+    "type": "folder",
+    "children": [
+      {
+        "id": "node-I00A-0",
+        "title": "Dr. Hector Upegui",
+        "type": "direct",
+        "content": "<div class=\"max-w-4xl mx-auto px-4 py-10\">\n    <h2 class=\"text-3xl font-bold mb-10 text-center\">Über mich</h2>\n    <div style=\"display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;\">\n        <div style=\"margin: 0 auto; display: inline-block; min-width: 250px;\">\n            <div class=\"badge-base LI-profile-badge\" data-locale=\"de_DE\" data-size=\"large\" data-theme=\"light\" data-type=\"VERTICAL\" data-vanity=\"hectorupegui\" data-version=\"v1\">\n                <a class=\"badge-base__link LI-simple-link\" href=\"https://de.linkedin.com/in/hectorupegui?trk=profile-badge\"></a>\n            </div>\n        </div>\n        <div class=\"mt-8\">\n            <a href=\"https://www.linkedin.com/in/hectorupegui\" target=\"_blank\" class=\"linkedin-btn shadow-xl\">\n                <svg width=\"20\" height=\"20\" fill=\"currentColor\" viewBox=\"0 0 24 24\">\n                    <path d=\"M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z\" />\n                </svg>\n                Mein LinkedIn Profil besuchen\n            </a>\n        </div> \n    </div>\n</div>"
+      },
+      {
+        "id": "node-I00B-1",
+        "title": "Biatris",
+        "type": "folder",
+        "children": []
+      }
+    ]
+  },
+  {
+    "id": "node-I00C-4",
+    "title": "Recursos",
+    "type": "folder",
+    "children": [
+      {
+        "id": "node-I00D-0",
+        "title": "Benchmark de IAs",
+        "type": "external",
+        "url": "https://epoch.ai/benchmarks/gpqa-diamond?view=graph&tab=release-date&colorPinned=OpenAI"
+      }
+    ]
+  },
+  {
+    "id": "node-I00E-5",
+    "title": "Bienvenido",
+    "type": "direct",
+    "content": "#¡Bienvenido/a al Curso!\n\n<p>\n  Le damos la más cordial bienvenida a esta experiencia de aprendizaje diseñada\n  especialmente para profesionales del sector salud interesados en comprender,\n  aplicar y aprovechar el potencial de la Inteligencia Artificial en su práctica\n  clínica, académica, investigativa y administrativa.\n</p>\n<br>\n<p>\n  Utilice el menú de navegación para acceder a los contenidos de cada módulo y\n  avanzar de forma progresiva a lo largo del curso. Durante esta formación\n  conocerá los fundamentos de la Inteligencia Artificial, las principales\n  herramientas disponibles y sus aplicaciones en el ámbito sanitario. Aprenderá\n  a identificar soluciones que apoyen la toma de decisiones clínicas, optimicen\n  procesos asistenciales y administrativos, fortalezcan la investigación y\n  mejoren la eficiencia en la atención de los pacientes, siempre considerando\n  los principios éticos, la seguridad de la información y la protección de los\n  datos en salud.\n</p>\n<br>\n##📋 Nota sobre la estructura del curso\n<p>\n  Los contenidos se desarrollarán conforme al programa académico establecido.\n  No obstante, el orden o la profundidad de algunos temas podrán ajustarse para\n  favorecer el proceso de aprendizaje y responder a la rápida evolución de las\n  tecnologías de Inteligencia Artificial y a la incorporación de nuevas\n  herramientas relevantes para el sector salud.\n</p>\n<br>\n\n##🔄 Actualización permanente\n<p>\n  La Inteligencia Artificial es un campo en constante evolución. Nuevos\n  modelos, funcionalidades y aplicaciones surgen de manera continua, por lo que\n  algunas herramientas o características presentadas durante el curso podrían\n  modificarse o actualizarse con el tiempo. Este material ha sido elaborado\n  procurando ofrecer información rigurosa, actualizada y basada en las mejores\n  prácticas disponibles al momento de su desarrollo.\n</p>\n<br>\n##ℹ️ Sobre este material\n<p>\n  Para la elaboración de este curso se utilizaron herramientas de Inteligencia\n  Artificial como apoyo en procesos editoriales, organización de contenidos y\n  diseño didáctico. Sin embargo, el contenido académico, el enfoque pedagógico,\n  la revisión científica y la validación técnica corresponden íntegramente al\n  trabajo intelectual del autor, garantizando una formación rigurosa, ética y\n  orientada a las necesidades de los profesionales de la salud.\n</p>\n<br>\n<div style=\"background-color:var(--accent-tint); border-left:4px solid var(--accent-color); border-radius:6px; padding:16px 20px; margin-top:28px;\">\n  <p style=\"margin:0; font-weight:600; color:var(--text-color);\">\n    ¡Le invitamos a participar activamente, explorar nuevas posibilidades y\n    descubrir cómo la Inteligencia Artificial puede convertirse en una aliada\n    para ofrecer una atención en salud más segura, eficiente, precisa y\n    centrada en el paciente!\n  </p>\n</div>"
+  },
+  {
+    "id": "node-I00F-6",
+    "title": "SECCIÓN",
+    "type": "divider"
+  },
+  {
+    "id": "node-I010-7",
+    "title": "Ensayito",
+    "type": "direct",
+    "content": "<h2>Ensayo</h2>"
+  },
+  {
+    "id": "node-I011-8",
+    "title": "ai index",
+    "type": "external",
+    "url": "https://hai.stanford.edu/ai-index/2026-ai-index-report"
+  },
+  {
+    "id": "node-I012-9",
+    "title": "AI Epoch",
+    "type": "external",
+    "url": "https://epoch.ai/about"
+  }
+];
+    </script>
+    <!-- DATA_END -->
+    <script
+      src="https://platform.linkedin.com/badges/js/profile.js"
+      async
+      defer
+    ></script>
+  </head>
+  <body>
+    <header class="main-header">
+      <button
+        id="toggle-sidebar-btn"
+        class="toggle-btn"
+        aria-label="Menú de navegación"
+      >
+        ☰
+      </button>
+      <div class="logo-area">
+        <img src="logo.png" alt="Logo" class="logo-img" />
+        <h1>IA en salud</h1>
+      </div>
+      <div class="header-spacer"></div>
+      <button
+        id="theme-toggle-btn"
+        class="toggle-btn theme-toggle-btn"
+        aria-label="Cambiar entre modo claro y oscuro"
+      ></button>
+    </header>
+
+    <div class="main-container">
+      <!-- Capa traslúcida para cerrar el menú en tablets al tocar fuera -->
+      <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-search-wrap">
+          <svg
+            class="sidebar-search-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            id="tree-search"
+            class="sidebar-search-input"
+            type="text"
+            placeholder="Buscar..."
+            aria-label="Buscar en el menú"
+          />
+        </div>
+        <nav id="tree-navigation" class="tree-nav"></nav>
+      </aside>
+
+      <main class="content-viewport">
+        <div id="reading-progress-track" class="reading-progress-track hidden">
+          <div id="reading-progress-fill" class="reading-progress-fill"></div>
+        </div>
+        <div id="content-breadcrumb" class="content-breadcrumb hidden"></div>
+        <div id="iframe-skeleton" class="skeleton-loader hidden">
+          <div class="skel-block skel-header"></div>
+          <div class="skel-block skel-line"></div>
+          <div class="skel-block skel-line"></div>
+          <div class="skel-block skel-line short"></div>
+          <div class="skel-block skel-line" style="margin-top: 16px"></div>
+          <div class="skel-block skel-line short"></div>
+        </div>
+        <iframe
+          id="content-frame"
+          name="content-frame"
+          src="about:blank"
+          title="Contenido"
+          class="hidden"
+        ></iframe>
+        <div id="direct-content-layer" class="direct-content hidden"></div>
+        <div id="empty-state" class="empty-state">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M9 5H7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2"
+            />
+            <rect x="9" y="3" width="6" height="4" rx="1" />
+          </svg>
+          <p>Seleccione un elemento del menú para ver su contenido</p>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      // Íconos modernos de carpeta (outline, heredan el color del texto vía
+      // currentColor, así que se tiñen solos en hover/activo).
+      const FOLDER_CLOSED_ICON =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2 -2h4l2 2h8a2 2 0 0 1 2 2v7a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"/></svg>';
+      const FOLDER_OPEN_ICON =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19l2.757 -7.351a1 1 0 0 1 .936 -.649h12.307a1 1 0 0 1 .986 1.164l-.996 5.211a2 2 0 0 1 -1.964 1.625h-14.026a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2h4l2 2h5a2 2 0 0 1 2 2v2"/></svg>';
+
+      const SUN_ICON =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 3v1M12 20v1M3 12h1M20 12h1M5.6 5.6l.7 .7M17.7 17.7l.7 .7M5.6 18.4l.7 -.7M17.7 6.3l.7 -.7"/></svg>';
+      const MOON_ICON =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9a9 9 0 1 1 -9 -9z"/></svg>';
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const sidebar = document.getElementById("sidebar");
+        const toggleBtn = document.getElementById("toggle-sidebar-btn");
+        const overlay = document.getElementById("sidebar-overlay");
+        const treeNav = document.getElementById("tree-navigation");
+        const iframe = document.getElementById("content-frame");
+        const directContentLayer = document.getElementById(
+          "direct-content-layer",
+        );
+        const treeSearch = document.getElementById("tree-search");
+        const breadcrumb = document.getElementById("content-breadcrumb");
+        const emptyState = document.getElementById("empty-state");
+        const skeletonLoader = document.getElementById("iframe-skeleton");
+        const progressTrack = document.getElementById("reading-progress-track");
+        const progressFill = document.getElementById("reading-progress-fill");
+
+        // Barra de progreso de lectura: solo aplica al contenido de texto
+        // (nodos "direct"), ya que no se puede medir el scroll dentro de un
+        // iframe de otro origen.
+        directContentLayer.addEventListener("scroll", () => {
+          const scrollable =
+            directContentLayer.scrollHeight - directContentLayer.clientHeight;
+          const pct =
+            scrollable > 0
+              ? (directContentLayer.scrollTop / scrollable) * 100
+              : 0;
+          progressFill.style.width = pct + "%";
+        });
+
+        // Determinar si la pantalla actual es Tablet o Móvil
+        function isMobileOrTablet() {
+          return window.innerWidth <= 1024;
+        }
+
+        // Inicializar estado del menú según el dispositivo
+        if (isMobileOrTablet()) {
+          sidebar.classList.remove("open");
+        } else {
+          sidebar.classList.remove("collapsed");
+        }
+
+        // Acción del botón Hamburguesa ☰
+        toggleBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (isMobileOrTablet()) {
+            const isOpen = sidebar.classList.toggle("open");
+            overlay.classList.toggle("active", isOpen);
+          } else {
+            sidebar.classList.toggle("collapsed");
+          }
+        });
+
+        // Cerrar menú al hacer click en la capa oscura de fondo
+        overlay.addEventListener("click", () => {
+          sidebar.classList.remove("open");
+          overlay.classList.remove("active");
+        });
+
+        // Modo oscuro
+        const themeToggleBtn = document.getElementById("theme-toggle-btn");
+
+        function applyTheme(theme) {
+          document.documentElement.setAttribute("data-theme", theme);
+          themeToggleBtn.innerHTML = theme === "dark" ? SUN_ICON : MOON_ICON;
+          try {
+            localStorage.setItem("spa-theme", theme);
+          } catch (e) {
+            // Si localStorage no está disponible, el tema simplemente no
+            // persistirá entre visitas, pero la app sigue funcionando.
+          }
+        }
+
+        applyTheme(
+          document.documentElement.getAttribute("data-theme") || "light",
+        );
+
+        themeToggleBtn.addEventListener("click", () => {
+          const current = document.documentElement.getAttribute("data-theme");
+          applyTheme(current === "dark" ? "light" : "dark");
+        });
+
+        function clearActiveStates() {
+          document.querySelectorAll(".node-row").forEach((row) => {
+            row.classList.remove("active");
+          });
+        }
+
+        function buildTreeDOM(nodesArray, isRoot = false, parentPath = []) {
+          const ul = document.createElement("ul");
+          ul.classList.add(isRoot ? "tree-root" : "node-children");
+
+          nodesArray.forEach((node) => {
+            // Separador de sección: solo una etiqueta visual, no es
+            // clickeable ni cuenta para la navegación del árbol.
+            if (node.type === "divider") {
+              const dividerLi = document.createElement("li");
+              dividerLi.classList.add("tree-node", "tree-divider");
+              const label = document.createElement("span");
+              label.classList.add("tree-divider-label");
+              label.textContent = node.title;
+              dividerLi.appendChild(label);
+              ul.appendChild(dividerLi);
+              return;
+            }
+
+            const li = document.createElement("li");
+            li.classList.add("tree-node");
+
+            const row = document.createElement("div");
+            row.classList.add("node-row");
+
+            const iconSpan = document.createElement("span");
+            iconSpan.classList.add("node-icon");
+
+            const textSpan = document.createElement("span");
+            textSpan.classList.add("node-text");
+            textSpan.textContent = node.title;
+            textSpan.title = node.title;
+
+            const hasChildren =
+              node.type === "folder" &&
+              node.children &&
+              node.children.length > 0;
+
+            // Chevron elegante: solo se muestra en carpetas con contenido.
+            // En el resto se agrega un espaciador para mantener la alineación.
+            let arrowSpan = null;
+            if (hasChildren) {
+              arrowSpan = document.createElement("span");
+              arrowSpan.classList.add("node-arrow");
+              arrowSpan.innerHTML =
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>';
+              row.appendChild(arrowSpan);
+            } else {
+              const spacer = document.createElement("span");
+              spacer.classList.add("node-arrow-spacer");
+              row.appendChild(spacer);
+            }
+
+            row.appendChild(iconSpan);
+            row.appendChild(textSpan);
+
+            if (node.type === "folder") {
+              iconSpan.innerHTML = FOLDER_CLOSED_ICON;
+
+              if (hasChildren) {
+                const countBadge = document.createElement("span");
+                countBadge.classList.add("node-count");
+                countBadge.textContent = node.children.length;
+                row.appendChild(countBadge);
+
+                const childUl = buildTreeDOM(
+                  node.children,
+                  false,
+                  parentPath.concat(node.title),
+                );
+                row.addEventListener("click", (e) => {
+                  e.stopPropagation();
+                  const isOpen = childUl.classList.toggle("open");
+                  iconSpan.innerHTML = isOpen
+                    ? FOLDER_OPEN_ICON
+                    : FOLDER_CLOSED_ICON;
+                  arrowSpan.classList.toggle("open", isOpen);
+                });
+                li.appendChild(row);
+                li.appendChild(childUl);
+              } else {
+                row.addEventListener("click", (e) => {
+                  e.stopPropagation();
+                });
+                li.appendChild(row);
+              }
+            } else if (node.type === "external" || node.type === "direct") {
+              let nodeIcon = node.type === "external" ? "🌐" : "📄";
+              const lowerTitle = node.title.toLowerCase();
+
+              if (
+                lowerTitle.includes("linkedin") ||
+                lowerTitle.includes("sobre mí") ||
+                lowerTitle.includes("perfil")
+              ) {
+                nodeIcon = "👤";
+              } else if (
+                lowerTitle.includes("configuracion") ||
+                lowerTitle.includes("ajustes")
+              ) {
+                nodeIcon = "⚙️";
+              }
+
+              if (node.icon) {
+                nodeIcon = node.icon;
+              }
+
+              iconSpan.textContent = nodeIcon;
+
+              row.addEventListener("click", (e) => {
+                e.stopPropagation();
+                clearActiveStates();
+                row.classList.add("active");
+                updateBreadcrumb(parentPath, node.title);
+                handleItemClick(node);
+
+                // UX TÁCTIL: Auto-colapsar barra lateral tras presionar en tablet/smartphone
+                if (isMobileOrTablet()) {
+                  sidebar.classList.remove("open");
+                  overlay.classList.remove("active");
+                }
+              });
+
+              li.appendChild(row);
+            }
+
+            ul.appendChild(li);
+          });
+
+          return ul;
+        }
+
+        function escapeHtml(str) {
+          const div = document.createElement("div");
+          div.textContent = str || "";
+          return div.innerHTML;
+        }
+
+        // Ubica en el DOM del árbol la carpeta correspondiente a una ruta de
+        // títulos (ej. ["Material"]), recorriendo la jerarquía de listas.
+        function findFolderLiByPath(pathArray) {
+          let currentList = treeNav.querySelector(":scope > .tree-root");
+          let matchedLi = null;
+
+          for (const title of pathArray) {
+            if (!currentList) return null;
+            const children = currentList.querySelectorAll(
+              ":scope > .tree-node",
+            );
+            matchedLi = null;
+            for (const li of children) {
+              const row = li.querySelector(":scope > .node-row");
+              const textEl = row ? row.querySelector(".node-text") : null;
+              if (textEl && textEl.textContent === title) {
+                matchedLi = li;
+                break;
+              }
+            }
+            if (!matchedLi) return null;
+            currentList = matchedLi.querySelector(":scope > .node-children");
+          }
+
+          return matchedLi;
+        }
+
+        // Al hacer click en un segmento del breadcrumb: expande esa carpeta
+        // en el sidebar (sin cerrar lo que ya estaba abierto) y la centra en
+        // la vista, para poder elegir fácilmente otro elemento dentro de ella.
+        function navigateToFolder(pathArray) {
+          const li = findFolderLiByPath(pathArray);
+          if (!li) return;
+
+          const row = li.querySelector(":scope > .node-row");
+          const childUl = li.querySelector(":scope > .node-children");
+          const arrowSpan = row.querySelector(".node-arrow");
+          const iconSpan = row.querySelector(".node-icon");
+
+          if (childUl && !childUl.classList.contains("open")) {
+            childUl.classList.add("open");
+            if (arrowSpan) arrowSpan.classList.add("open");
+            if (iconSpan) iconSpan.innerHTML = FOLDER_OPEN_ICON;
+          }
+
+          if (isMobileOrTablet()) {
+            sidebar.classList.add("open");
+            overlay.classList.add("active");
+          }
+
+          li.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+
+        function updateBreadcrumb(pathArray, currentTitle) {
+          breadcrumb.innerHTML = "";
+
+          pathArray.forEach((title, index) => {
+            const segment = document.createElement("span");
+            segment.textContent = title;
+            segment.classList.add("crumb-link");
+            segment.addEventListener("click", () =>
+              navigateToFolder(pathArray.slice(0, index + 1)),
+            );
+            breadcrumb.appendChild(segment);
+
+            const sep = document.createElement("span");
+            sep.innerHTML =
+              '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>';
+            breadcrumb.appendChild(sep);
+          });
+
+          const current = document.createElement("span");
+          current.className = "crumb-current";
+          current.textContent = currentTitle;
+          breadcrumb.appendChild(current);
+
+          breadcrumb.classList.remove("hidden");
+        }
+
+        // Reinicia la animación de fade-in quitando y volviendo a poner la
+        // clase (si no se quita antes, el navegador no vuelve a dispararla).
+        function playFadeIn(el) {
+          el.classList.remove("content-fade-in");
+          void el.offsetWidth; // fuerza reflow
+          el.classList.add("content-fade-in");
+        }
+
+        function handleItemClick(item) {
+          emptyState.classList.add("hidden");
+          progressTrack.classList.add("hidden"); // se reactiva solo para "direct"
+
+          if (item.type === "external") {
+            const url = item.url || "about:blank";
+            const isPdf = /\.pdf(\?.*)?$/i.test(url);
+
+            // En móvil/tablet, los navegadores no manejan de forma confiable
+            // un PDF incrustado en iframe (Safari iOS lo muestra en blanco,
+            // Android a veces requiere un toque extra). En vez de pelear
+            // contra eso, se muestra una tarjeta con un botón <a> real que
+            // deja que el sistema operativo abra el PDF con su propio visor
+            // nativo (paginación y zoom funcionan perfecto de esa forma).
+            if (isPdf && isMobileOrTablet()) {
+              iframe.classList.add("hidden");
+              skeletonLoader.classList.add("hidden");
+              iframe.src = "about:blank";
+              directContentLayer.classList.remove("hidden");
+              directContentLayer.innerHTML = `
+                <div class="pdf-open-card">
+                  <div class="pdf-open-icon">📄</div>
+                  <div class="pdf-open-title">${escapeHtml(item.title)}</div>
+                  <div class="pdf-open-hint">
+                    Este documento se abrirá con el visor de PDF de tu dispositivo.
+                  </div>
+                  <a class="pdf-open-btn" href="${url}" target="_blank" rel="noopener">
+                    📥 Abrir PDF
+                  </a>
+                </div>
+              `;
+              playFadeIn(directContentLayer);
+              return;
+            }
+
+            directContentLayer.classList.add("hidden");
+            // Se muestra el skeleton mientras el iframe termina de cargar;
+            // el propio iframe queda oculto hasta que dispare "onload".
+            iframe.classList.add("hidden");
+            skeletonLoader.classList.remove("hidden");
+            iframe.src = url;
+          } else if (item.type === "direct") {
+            iframe.classList.add("hidden");
+            skeletonLoader.classList.add("hidden");
+            iframe.src = "about:blank";
+            directContentLayer.classList.remove("hidden");
+            directContentLayer.scrollTop = 0;
+            progressFill.style.width = "0%";
+            progressTrack.classList.remove("hidden");
+            directContentLayer.innerHTML =
+              item.content || "<i>Sin contenido registrado</i>";
+            playFadeIn(directContentLayer);
+
+            if (typeof IN !== "undefined" && IN.parse) {
+              IN.parse();
+            }
+          }
+        }
+
+        // Al terminar de cargar el iframe: oculta el skeleton y muestra el
+        // contenido con el fade-in habitual. Se ignora "about:blank" para no
+        // dispararse falsamente al limpiar el iframe entre navegaciones.
+        iframe.addEventListener("load", () => {
+          if (!iframe.src || iframe.src === "about:blank") return;
+          skeletonLoader.classList.add("hidden");
+          iframe.classList.remove("hidden");
+          playFadeIn(iframe);
+        });
+
+        // Buscador: filtra ítems por título; si un hijo coincide, expande
+        // automáticamente a sus carpetas ancestras para mostrarlo.
+        function filterNode(li, query) {
+          // Los separadores no son parte de la búsqueda: se ocultan siempre
+          // que haya un filtro activo (no tienen contenido que "coincida").
+          if (li.classList.contains("tree-divider")) {
+            li.classList.add("search-hidden");
+            return false;
+          }
+
+          const row = li.querySelector(":scope > .node-row");
+          const textEl = row.querySelector(".node-text");
+          const text = (textEl ? textEl.textContent : "").toLowerCase();
+          const childUl = li.querySelector(":scope > .node-children");
+
+          let selfMatch = text.includes(query);
+          let childMatch = false;
+
+          if (childUl) {
+            const childItems = childUl.querySelectorAll(":scope > .tree-node");
+            childItems.forEach((childLi) => {
+              if (filterNode(childLi, query)) childMatch = true;
+            });
+          }
+
+          const shouldShow = selfMatch || childMatch;
+          li.classList.toggle("search-hidden", !shouldShow);
+
+          if (childMatch && childUl) {
+            childUl.classList.add("open");
+            const arrowSpan = row.querySelector(".node-arrow");
+            const iconSpan = row.querySelector(".node-icon");
+            if (arrowSpan) arrowSpan.classList.add("open");
+            if (iconSpan) iconSpan.innerHTML = FOLDER_OPEN_ICON;
+          }
+
+          return shouldShow;
+        }
+
+        function filterTree(rawQuery) {
+          const query = rawQuery.trim().toLowerCase();
+          const rootItems = treeNav.querySelectorAll(
+            ":scope > .tree-root > .tree-node",
+          );
+
+          if (!query) {
+            treeNav
+              .querySelectorAll(".tree-node")
+              .forEach((li) => li.classList.remove("search-hidden"));
+            return;
+          }
+
+          rootItems.forEach((li) => filterNode(li, query));
+        }
+
+        treeSearch.addEventListener("input", (e) => filterTree(e.target.value));
+
+        // Inicialización del Árbol
+        if (
+          typeof window.projectData !== "undefined" &&
+          Array.isArray(window.projectData)
+        ) {
+          const treeDOM = buildTreeDOM(window.projectData, true);
+          treeNav.appendChild(treeDOM);
+        } else {
+          treeNav.innerHTML =
+            "<p style='color:red; padding:10px;'>Error: No se detectó 'window.projectData'.</p>";
+        }
+
+        // Recalcular estados visuales si se cambia la orientación del dispositivo
+        window.addEventListener("resize", () => {
+          if (!isMobileOrTablet()) {
+            sidebar.classList.remove("open");
+            overlay.classList.remove("active");
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
